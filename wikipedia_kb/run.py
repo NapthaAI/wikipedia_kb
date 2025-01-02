@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Dict, Any
 from naptha_sdk.schemas import KBDeployment
 from naptha_sdk.storage.storage_provider import StorageProvider
-from naptha_sdk.storage.schemas import CreateTableRequest, CreateRowRequest, ReadStorageRequest, DeleteTableRequest, DeleteRowRequest, ListRowsRequest
+from naptha_sdk.storage.schemas import CreateTableRequest, CreateRowRequest, ReadStorageRequest, DeleteStorageRequest, ListStorageRequest, DatabaseReadOptions
 
 from wikipedia_kb.schemas import InputSchema
 
@@ -15,20 +15,13 @@ logger = logging.getLogger(__name__)
 
 
 class WikipediaKB:
-    def __init__(self, module_run: Dict[str, Any]):
-        self.module_run = module_run
-        self.deployment = module_run.deployment
+    def __init__(self, deployment: Dict[str, Any]):
+        self.deployment = deployment
         self.config = self.deployment.config
         self.storage_provider = StorageProvider(self.deployment.node)
         self.storage_type = self.config["storage_type"]
         self.table_name = self.config["path"]
         self.schema = self.config["schema"]
-
-        # Get the input schema
-        if isinstance(self.module_run.inputs, dict):
-            self.input_schema = InputSchema(**self.module_run.inputs)
-        else:
-            self.input_schema = InputSchema.model_validate(self.module_run.inputs)
     
     # TODO: Remove this. In future, the create function should be called by create_module in the same way that run is called by run_module
     async def init(self, *args, **kwargs):
@@ -67,13 +60,12 @@ class WikipediaKB:
         return {"status": "success", "message": f"Successfully added {len(data)} rows to table {self.table_name}"}
 
     async def run_query(self, input_data: Dict[str, Any], *args, **kwargs):
-        # Query the table
         logger.info(f"Querying table {self.table_name} with query: {input_data['query']}")
 
         read_storage_request = ReadStorageRequest(
             storage_type=self.storage_type,
             path=self.table_name,
-            db_options={"condition": {'title': input_data['query']}}
+            options=DatabaseReadOptions(conditions=[{'title': input_data['query']}])
         )
 
         read_result = await self.storage_provider.read(read_storage_request)
@@ -81,17 +73,17 @@ class WikipediaKB:
         return {"status": "success", "message": f"Query results: {read_result}"}
 
     async def list_rows(self, input_data: Dict[str, Any], *args, **kwargs):
-        list_rows_request = ListRowsRequest(
+        list_storage_request = ListStorageRequest(
             storage_type=self.storage_type,
             path=self.table_name,
-            limit=input_data['limit']
+            options=DatabaseReadOptions(limit=input_data['limit'])
         )
-        list_rows_result = await self.storage_provider.list(list_rows_request)
-        logger.info(f"List rows result: {list_rows_result}")
-        return {"status": "success", "message": f"List rows result: {list_rows_result}"}
+        list_storage_result = await self.storage_provider.list(list_storage_request)
+        logger.info(f"List rows result: {list_storage_result}")
+        return {"status": "success", "message": f"List rows result: {list_storage_result}"}
 
     async def delete_table(self, input_data: Dict[str, Any], *args, **kwargs):
-        delete_table_request = DeleteTableRequest(
+        delete_table_request = DeleteStorageRequest(
             storage_type=self.storage_type,
             path=input_data['table_name'],
         )
@@ -100,13 +92,11 @@ class WikipediaKB:
         return {"status": "success", "message": f"Delete table result: {delete_table_result}"}
 
     async def delete_row(self, input_data: Dict[str, Any], *args, **kwargs):
-        delete_row_request = DeleteRowRequest(
+        delete_row_request = DeleteStorageRequest(
             storage_type=self.storage_type,
             path=self.table_name,
-            condition=input_data['condition']
+            options={"condition": input_data['condition']}
         )
-
-        print("YYYY", input_data['condition'])
 
         delete_row_result = await self.storage_provider.delete(delete_row_request)
         logger.info(f"Delete row result: {delete_row_result}")
@@ -170,7 +160,7 @@ async def run(module_run: Dict[str, Any], *args, **kwargs):
     Args:
         module_run: Module run configuration containing deployment details
     """
-    wikipedia_kb = WikipediaKB(module_run)
+    wikipedia_kb = WikipediaKB(module_run.deployment)
 
     method = getattr(wikipedia_kb, module_run.inputs.function_name, None)
 
