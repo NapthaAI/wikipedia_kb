@@ -4,7 +4,7 @@ import random
 import pandas as pd
 from tqdm import tqdm
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, List
 from naptha_sdk.schemas import KBDeployment
 from naptha_sdk.storage.storage_provider import StorageProvider
 from naptha_sdk.storage.schemas import CreateTableRequest, CreateRowRequest, ReadStorageRequest, DeleteStorageRequest, ListStorageRequest, DatabaseReadOptions
@@ -28,36 +28,32 @@ class WikipediaKB:
         await create(self.deployment)
         return {"status": "success", "message": f"Successfully populated {self.table_name} table"}
     
-    async def add_data(self, *args, **kwargs):
+    async def add_data(self, input_data: Dict[str, Any], *args, **kwargs):
+        logger.info(f"Adding {(input_data)} to table {self.table_name}")
 
-        # Add rows to the table
-        data = json.loads(self.input_schema.data)
+        # if row has no id, generate a random one
+        if 'id' not in input_data:
+            input_data['id'] = random.randint(1, 1000000)
 
-        logger.info(f"Adding {len(data)} rows to table {self.table_name}")
-        for row in tqdm(data, total=len(data)):
-            # if row has no id, generate a random one
-            if 'id' not in row:
-                row['id'] = random.randint(1, 1000000)
+        read_result = await self.storage_provider.read(ReadStorageRequest(
+            storage_type=self.storage_type,
+            path=self.table_name,
+            options=DatabaseReadOptions(conditions=[{'title': input_data['title']}])
+        ))
 
-            read_result = await self.storage_provider.read(
-                storage_type=self.storage_type,
-                path=self.table_name,
-                condition={'title': row['title']}
-            )
+        # make sure title are not in the table
+        if len(read_result) > 0:
+            return {"status": "error", "message": f"Title {input_data['title']} already exists in table {self.table_name}"}
 
-            # make sure title are not in the table
-            if read_result["rows"]:
-                continue
+        create_row_result = await self.storage_provider.create(CreateRowRequest(
+            storage_type=self.storage_type,
+            path=self.table_name,
+            data=input_data
+        ))
+        logger.info(f"Create row result: {create_row_result}")
 
-            create_row_result = await self.storage_provider.create(CreateRowRequest(
-                storage_type=self.storage_type,
-                path=self.table_name,
-                data=row
-            ))
-            logger.info(f"Create row result: {create_row_result}")
-
-        logger.info(f"Successfully added {len(data)} rows to table {self.table_name}")
-        return {"status": "success", "message": f"Successfully added {len(data)} rows to table {self.table_name}"}
+        logger.info(f"Successfully added {input_data} to table {self.table_name}")
+        return {"status": "success", "message": f"Successfully added {input_data} to table {self.table_name}"}
 
     async def run_query(self, input_data: Dict[str, Any], *args, **kwargs):
         logger.info(f"Querying table {self.table_name} with query: {input_data['query']}")
@@ -76,7 +72,7 @@ class WikipediaKB:
         list_storage_request = ListStorageRequest(
             storage_type=self.storage_type,
             path=self.table_name,
-            options=DatabaseReadOptions(limit=input_data['limit'])
+            options=DatabaseReadOptions(limit=input_data['limit'] if input_data and 'limit' in input_data else None)
         )
         list_storage_result = await self.storage_provider.list(list_storage_request)
         logger.info(f"List rows result: {list_storage_result}")
@@ -188,7 +184,11 @@ if __name__ == "__main__":
         ),
         "add_data": InputSchema(
             function_name="add_data",
-            function_input_data=None,
+            function_input_data={
+                "url": "https://en.wikipedia.org/wiki/Socrates",
+                "title": "Socrates", 
+                "text": "Socrates was a Greek philosopher from Athens who is credited as the founder of Western philosophy and as among the first moral philosophers of the ethical tradition of thought."
+            },
         ),
         "run_query": InputSchema(
             function_name="run_query",
