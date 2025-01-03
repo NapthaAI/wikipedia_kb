@@ -4,7 +4,6 @@
         "module": {"name": "wikipedia_kb"},
         "node": {"ip": "localhost"},
         "config": {
-            "config_schema": "WikipediaKBConfig",
             "storage_type": "db",
             "path": "wikipedia_kb",
             "query_col": "title",
