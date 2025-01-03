@@ -19,9 +19,9 @@ class WikipediaKB:
         self.deployment = deployment
         self.config = self.deployment.config
         self.storage_provider = StorageProvider(self.deployment.node)
-        self.storage_type = self.config["storage_type"]
-        self.table_name = self.config["path"]
-        self.schema = self.config["schema"]
+        self.storage_type = self.config.storage_type
+        self.table_name = self.config.path
+        self.schema = self.config.schema
     
     # TODO: Remove this. In future, the create function should be called by create_module in the same way that run is called by run_module
     async def init(self, *args, **kwargs):
@@ -108,9 +108,9 @@ async def create(deployment: KBDeployment):
     file_path = Path(__file__).parent / "data" / "wikipedia_kb_sample.parquet"
 
     storage_provider = StorageProvider(deployment.node)
-    storage_type = deployment.config["storage_type"]
-    table_name = deployment.config["path"]
-    schema = deployment.config["schema"]
+    storage_type = deployment.config.storage_type
+    table_name = deployment.config.path
+    schema = deployment.config.schema
 
     logger.info(f"Creating {storage_type} at {table_name} with schema {schema}")
 

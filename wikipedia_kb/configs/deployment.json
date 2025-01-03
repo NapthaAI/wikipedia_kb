@@ -6,8 +6,10 @@
         "config": {
             "storage_type": "db",
             "path": "wikipedia_kb",
-            "query_col": "title",
-            "answer_col": "text",
+            "options": {
+                "query_col": "title",
+                "answer_col": "text"
+            },
             "schema": {
                 "id": {"type": "INTEGER", "primary_key": true},
                 "url": {"type": "TEXT"},
