@@ -5,7 +5,7 @@ import pandas as pd
 from tqdm import tqdm
 from pathlib import Path
 from typing import Dict, Any, List
-from naptha_sdk.schemas import KBDeployment
+from naptha_sdk.schemas import KBDeployment, KBRunInput
 from naptha_sdk.storage.storage_provider import StorageProvider
 from naptha_sdk.storage.schemas import CreateTableRequest, CreateRowRequest, ReadStorageRequest, DeleteStorageRequest, ListStorageRequest, DatabaseReadOptions
 
@@ -156,6 +156,8 @@ async def run(module_run: Dict[str, Any], *args, **kwargs):
     Args:
         module_run: Module run configuration containing deployment details
     """
+    module_run = KBRunInput(**module_run)
+    module_run.inputs = InputSchema(**module_run.inputs)
     wikipedia_kb = WikipediaKB(module_run.deployment)
 
     method = getattr(wikipedia_kb, module_run.inputs.function_name, None)
@@ -171,48 +173,47 @@ if __name__ == "__main__":
     import os
     from naptha_sdk.client.naptha import Naptha
     from naptha_sdk.configs import setup_module_deployment
-    from naptha_sdk.schemas import KBRunInput
 
     naptha = Naptha()
 
     deployment = asyncio.run(setup_module_deployment("kb", "wikipedia_kb/configs/deployment.json", node_url = os.getenv("NODE_URL")))
 
     inputs_dict = {
-        "init": InputSchema(
-            function_name="init",
-            function_input_data=None,
-        ),
-        "add_data": InputSchema(
-            function_name="add_data",
-            function_input_data={
+        "init": {
+            "function_name": "init",
+            "function_input_data": None,
+        },
+        "add_data": {
+            "function_name": "add_data",
+            "function_input_data": {
                 "url": "https://en.wikipedia.org/wiki/Socrates",
                 "title": "Socrates", 
                 "text": "Socrates was a Greek philosopher from Athens who is credited as the founder of Western philosophy and as among the first moral philosophers of the ethical tradition of thought."
             },
-        ),
-        "run_query": InputSchema(
-            function_name="run_query",
-            function_input_data={"query": "Elon Musk"},
-        ),
-        "list_rows": InputSchema(
-            function_name="list_rows",
-            function_input_data={"limit": 10},
-        ),
-        "delete_table": InputSchema(
-            function_name="delete_table",
-            function_input_data={"table_name": "wikipedia_kb"},
-        ),
-        "delete_row": InputSchema(
-            function_name="delete_row",
-            function_input_data={"condition": {"title": "Elon Musk"}},
-        ),
+        },
+        "run_query": {
+            "function_name": "run_query",
+            "function_input_data": {"query": "Elon Musk"},
+        },
+        "list_rows": {
+            "function_name": "list_rows",
+            "function_input_data": {"limit": 10},
+        },
+        "delete_table": {
+            "function_name": "delete_table",
+            "function_input_data": {"table_name": "wikipedia_kb"},
+        },
+        "delete_row": {
+            "function_name": "delete_row",
+            "function_input_data": {"condition": {"title": "Elon Musk"}},
+        },
     }
 
-    module_run = KBRunInput(
-        inputs=inputs_dict["init"],
-        deployment=deployment,
-        consumer_id=naptha.user.id,
-    )
+    module_run = {
+        "inputs": inputs_dict["delete_table"],
+        "deployment": deployment,
+        "consumer_id": naptha.user.id,
+    }
 
     response = asyncio.run(run(module_run))
 
