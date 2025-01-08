@@ -7,7 +7,8 @@ from pathlib import Path
 from typing import Dict, Any, List
 from naptha_sdk.schemas import KBDeployment, KBRunInput
 from naptha_sdk.storage.storage_provider import StorageProvider
-from naptha_sdk.storage.schemas import CreateTableRequest, CreateRowRequest, ReadStorageRequest, DeleteStorageRequest, ListStorageRequest, DatabaseReadOptions
+from naptha_sdk.storage.schemas import CreateStorageRequest, ReadStorageRequest, DeleteStorageRequest, ListStorageRequest, DatabaseReadOptions
+from naptha_sdk.user import sign_consumer_id
 
 from wikipedia_kb.schemas import InputSchema
 
@@ -35,20 +36,20 @@ class WikipediaKB:
         if 'id' not in input_data:
             input_data['id'] = random.randint(1, 1000000)
 
-        read_result = await self.storage_provider.read(ReadStorageRequest(
-            storage_type=self.storage_type,
-            path=self.table_name,
-            options=DatabaseReadOptions(conditions=[{'title': input_data['title']}])
-        ))
+        # read_result = await self.storage_provider.execute(ReadStorageRequest(
+        #     storage_type=self.storage_type,
+        #     path=self.table_name,
+        #     options={"condition": {"title": input_data["title"]}}
+        # ))
 
         # make sure title are not in the table
-        if len(read_result) > 0:
-            return {"status": "error", "message": f"Title {input_data['title']} already exists in table {self.table_name}"}
+        # if len(read_result) > 0:
+        #     return {"status": "error", "message": f"Title {input_data['title']} already exists in table {self.table_name}"}
 
-        create_row_result = await self.storage_provider.create(CreateRowRequest(
+        create_row_result = await self.storage_provider.execute(CreateStorageRequest(
             storage_type=self.storage_type,
             path=self.table_name,
-            data=input_data
+            data={"data": input_data}
         ))
         logger.info(f"Create row result: {create_row_result}")
 
@@ -61,10 +62,10 @@ class WikipediaKB:
         read_storage_request = ReadStorageRequest(
             storage_type=self.storage_type,
             path=self.table_name,
-            options=DatabaseReadOptions(conditions=[{'title': input_data['query']}])
+            options={"condition": {"title": input_data["query"]}}
         )
 
-        read_result = await self.storage_provider.read(read_storage_request)
+        read_result = await self.storage_provider.execute(read_storage_request)
         logger.info(f"Query results: {read_result}")
         return {"status": "success", "message": f"Query results: {read_result}"}
 
@@ -72,9 +73,9 @@ class WikipediaKB:
         list_storage_request = ListStorageRequest(
             storage_type=self.storage_type,
             path=self.table_name,
-            options=DatabaseReadOptions(limit=input_data['limit'] if input_data and 'limit' in input_data else None)
+            options={"limit": input_data['limit'] if input_data and 'limit' in input_data else None}
         )
-        list_storage_result = await self.storage_provider.list(list_storage_request)
+        list_storage_result = await self.storage_provider.execute(list_storage_request)
         logger.info(f"List rows result: {list_storage_result}")
         return {"status": "success", "message": f"List rows result: {list_storage_result}"}
 
@@ -83,7 +84,7 @@ class WikipediaKB:
             storage_type=self.storage_type,
             path=input_data['table_name'],
         )
-        delete_table_result = await self.storage_provider.delete(delete_table_request)
+        delete_table_result = await self.storage_provider.execute(delete_table_request)
         logger.info(f"Delete table result: {delete_table_result}")
         return {"status": "success", "message": f"Delete table result: {delete_table_result}"}
 
@@ -94,7 +95,7 @@ class WikipediaKB:
             options={"condition": input_data['condition']}
         )
 
-        delete_row_result = await self.storage_provider.delete(delete_row_request)
+        delete_row_result = await self.storage_provider.execute(delete_row_request)
         logger.info(f"Delete row result: {delete_row_result}")
         return {"status": "success", "message": f"Delete row result: {delete_row_result}"}
 
@@ -110,18 +111,19 @@ async def create(deployment: KBDeployment):
     storage_provider = StorageProvider(deployment.node)
     storage_type = deployment.config.storage_type
     table_name = deployment.config.path
-    schema = deployment.config.schema
+    schema = {"schema": deployment.config.schema}
 
     logger.info(f"Creating {storage_type} at {table_name} with schema {schema}")
 
-    create_table_request = CreateTableRequest(
+
+    create_table_request = CreateStorageRequest(
         storage_type=storage_type,
         path=table_name,
-        schema=schema
+        data=schema
     )
 
     # Create a table
-    create_table_result = await storage_provider.create(create_table_request)
+    create_table_result = await storage_provider.execute(create_table_request)
 
     logger.info(f"Result: {create_table_result}")
 
@@ -132,14 +134,16 @@ async def create(deployment: KBDeployment):
     logger.info("Adding rows to table")
     for _, row in tqdm(df.iterrows(), total=len(df)):
         row_data = {
-            "id": int(row['id']),
-            "url": str(row['url']),
-            "title": str(row['title']),
-            "text": str(row['text'])
+            "data": {
+                "id": int(row['id']),
+                "url": str(row['url']),
+                "title": str(row['title']),
+                "text": str(row['text'])
+            }
         }
 
         # Add a row
-        create_row_result = await storage_provider.create(CreateRowRequest(
+        create_row_result = await storage_provider.execute(CreateStorageRequest(
             storage_type=storage_type,
             path=table_name,
             data=row_data
@@ -213,6 +217,7 @@ if __name__ == "__main__":
         "inputs": inputs_dict["delete_table"],
         "deployment": deployment,
         "consumer_id": naptha.user.id,
+        "signature": sign_consumer_id(naptha.user.id, os.getenv("PRIVATE_KEY"))
     }
 
     response = asyncio.run(run(module_run))
