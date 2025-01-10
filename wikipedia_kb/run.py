@@ -36,15 +36,15 @@ class WikipediaKB:
         if 'id' not in input_data:
             input_data['id'] = random.randint(1, 1000000)
 
-        # read_result = await self.storage_provider.execute(ReadStorageRequest(
-        #     storage_type=self.storage_type,
-        #     path=self.table_name,
-        #     options={"condition": {"title": input_data["title"]}}
-        # ))
+        read_result = await self.storage_provider.execute(ReadStorageRequest(
+            storage_type=self.storage_type,
+            path=self.table_name,
+            options={"conditions": [{"title": input_data["title"]}]}
+        ))
 
         # make sure title are not in the table
-        # if len(read_result) > 0:
-        #     return {"status": "error", "message": f"Title {input_data['title']} already exists in table {self.table_name}"}
+        if len(read_result.data) > 0:
+            return {"status": "error", "message": f"Title {input_data['title']} already exists in table {self.table_name}"}
 
         create_row_result = await self.storage_provider.execute(CreateStorageRequest(
             storage_type=self.storage_type,
@@ -62,11 +62,11 @@ class WikipediaKB:
         read_storage_request = ReadStorageRequest(
             storage_type=self.storage_type,
             path=self.table_name,
-            options={"condition": {"title": input_data["query"]}}
+            options={"conditions": [{"title": input_data["query"]}]}
         )
 
         read_result = await self.storage_provider.execute(read_storage_request)
-        logger.info(f"Query results: {read_result}")
+        print(f"Query results: {read_result}")
         return {"status": "success", "message": f"Query results: {read_result}"}
 
     async def list_rows(self, input_data: Dict[str, Any], *args, **kwargs):
