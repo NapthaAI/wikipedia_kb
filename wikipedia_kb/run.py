@@ -20,9 +20,9 @@ class WikipediaKB:
         self.deployment = deployment
         self.config = self.deployment.config
         self.storage_provider = StorageProvider(self.deployment.node)
-        self.storage_type = self.config.storage_type
-        self.table_name = self.config.path
-        self.schema = self.config.schema
+        self.storage_type = self.config.storage_config.storage_type
+        self.table_name = self.config.storage_config.path
+        self.schema = self.config.storage_config.storage_schema
     
     # TODO: Remove this. In future, the create function should be called by create_module in the same way that run is called by run_module
     async def init(self, *args, **kwargs):
@@ -109,9 +109,9 @@ async def create(deployment: KBDeployment):
     file_path = Path(__file__).parent / "data" / "wikipedia_kb_sample.parquet"
 
     storage_provider = StorageProvider(deployment.node)
-    storage_type = deployment.config.storage_type
-    table_name = deployment.config.path
-    schema = {"schema": deployment.config.schema}
+    storage_type = deployment.config.storage_config.storage_type
+    table_name = deployment.config.storage_config.path
+    schema = {"schema": deployment.config.storage_config.storage_schema}
 
     logger.info(f"Creating {storage_type} at {table_name} with schema {schema}")
 
@@ -215,18 +215,18 @@ if __name__ == "__main__":
             "func_name": "list_rows",
             "func_input_data": {"limit": 10},
         },
-        "delete_table": {
-            "func_name": "delete_table",
-            "func_input_data": {"table_name": "wikipedia_kb"},
-        },
         "delete_row": {
             "func_name": "delete_row",
             "func_input_data": {"condition": {"title": "Elon Musk"}},
         },
+        "delete_table": {
+            "func_name": "delete_table",
+            "func_input_data": {"table_name": "wikipedia_kb"},
+        },
     }
 
     module_run = {
-        "inputs": inputs_dict["delete_row"],
+        "inputs": inputs_dict["delete_table"],
         "deployment": deployment,
         "consumer_id": naptha.user.id,
         "signature": sign_consumer_id(naptha.user.id, os.getenv("PRIVATE_KEY"))

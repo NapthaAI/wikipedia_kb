@@ -7,7 +7,7 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = ">=3.10,<=3.13"
-naptha-sdk = {git = "https://github.com/NapthaAI/naptha-sdk.git"}
+naptha-sdk = {git = "https://github.com/NapthaAI/naptha-sdk.git", branch = "chore/update-storage-config"}
 pydantic = "^2.9.2"
 pandas = "^2.2.3"
 pyarrow = "^18.1.0"
