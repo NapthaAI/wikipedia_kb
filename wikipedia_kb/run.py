@@ -26,8 +26,8 @@ class WikipediaKB:
     
     # TODO: Remove this. In future, the create function should be called by create_module in the same way that run is called by run_module
     async def init(self, *args, **kwargs):
-        await create(self.deployment)
-        return {"status": "success", "message": f"Successfully populated {self.table_name} table"}
+        result = await create(self.deployment)
+        return result
     
     async def add_data(self, input_data: Dict[str, Any], *args, **kwargs):
         logger.info(f"Adding {(input_data)} to table {self.table_name}")
@@ -115,6 +115,18 @@ async def create(deployment: KBDeployment):
 
     logger.info(f"Creating {storage_type} at {table_name} with schema {schema}")
 
+    # First check if the table exists
+    logger.info(f"Checking if table {table_name} exists")
+    try:
+        list_storage_request = ListStorageRequest(
+            storage_type=storage_type,
+            path=table_name,
+        )
+        list_storage_result = await storage_provider.execute(list_storage_request)
+        logger.info(f"Table {table_name} already exists")
+        return {"status": "success", "message": f"Table {table_name} already exists"}
+    except Exception as e:
+        logger.info(f"Table {table_name} does not exist")
 
     create_table_request = CreateStorageRequest(
         storage_type=storage_type,
@@ -152,7 +164,7 @@ async def create(deployment: KBDeployment):
         logger.info(f"Add row result: {create_row_result}")
     
     logger.info(f"Successfully populated {table_name} table with {len(df)} rows")
-
+    return {"status": "success", "message": f"Successfully populated {table_name} table with {len(df)} rows"}
 
 async def run(module_run: Dict[str, Any], *args, **kwargs):
     """
@@ -164,12 +176,12 @@ async def run(module_run: Dict[str, Any], *args, **kwargs):
     module_run.inputs = InputSchema(**module_run.inputs)
     wikipedia_kb = WikipediaKB(module_run.deployment)
 
-    method = getattr(wikipedia_kb, module_run.inputs.function_name, None)
+    method = getattr(wikipedia_kb, module_run.inputs.func_name, None)
 
     if not method:
-        raise ValueError(f"Invalid function name: {module_run.inputs.function_name}")
+        raise ValueError(f"Invalid function name: {module_run.inputs.func_name}")
 
-    return await method(module_run.inputs.function_input_data)
+    return await method(module_run.inputs.func_input_data)
 
 
 if __name__ == "__main__":
@@ -184,37 +196,37 @@ if __name__ == "__main__":
 
     inputs_dict = {
         "init": {
-            "function_name": "init",
-            "function_input_data": None,
+            "func_name": "init",
+            "func_input_data": None,
         },
         "add_data": {
-            "function_name": "add_data",
-            "function_input_data": {
+            "func_name": "add_data",
+            "func_input_data": {
                 "url": "https://en.wikipedia.org/wiki/Socrates",
                 "title": "Socrates", 
                 "text": "Socrates was a Greek philosopher from Athens who is credited as the founder of Western philosophy and as among the first moral philosophers of the ethical tradition of thought."
             },
         },
         "run_query": {
-            "function_name": "run_query",
-            "function_input_data": {"query": "Elon Musk"},
+            "func_name": "run_query",
+            "func_input_data": {"query": "Elon Musk"},
         },
         "list_rows": {
-            "function_name": "list_rows",
-            "function_input_data": {"limit": 10},
+            "func_name": "list_rows",
+            "func_input_data": {"limit": 10},
         },
         "delete_table": {
-            "function_name": "delete_table",
-            "function_input_data": {"table_name": "wikipedia_kb"},
+            "func_name": "delete_table",
+            "func_input_data": {"table_name": "wikipedia_kb"},
         },
         "delete_row": {
-            "function_name": "delete_row",
-            "function_input_data": {"condition": {"title": "Elon Musk"}},
+            "func_name": "delete_row",
+            "func_input_data": {"condition": {"title": "Elon Musk"}},
         },
     }
 
     module_run = {
-        "inputs": inputs_dict["delete_table"],
+        "inputs": inputs_dict["delete_row"],
         "deployment": deployment,
         "consumer_id": naptha.user.id,
         "signature": sign_consumer_id(naptha.user.id, os.getenv("PRIVATE_KEY"))
